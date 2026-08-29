@@ -1,4 +1,9 @@
-# TechJam Conversational E-Commerce Search Challenge
+# Autonomous Conversational Search Agent — TechJam 2026
+
+This repository is a participant solution built on the official
+[`TechJam2026/techjam-conversational-search`](https://github.com/TechJam2026/techjam-conversational-search)
+kit. The solution adds an autonomous, stateful LLM planning and ranking loop
+while retaining a network-free retrieval fallback.
 
 Build an AI shopping agent that asks useful follow-up questions and recommends the customer's hidden target product within at most 10 turns.
 
@@ -23,7 +28,9 @@ The session ends when the target product appears in the scored Top 10 or after t
 
 ## Download the Catalog
 
-Download `catalog.jsonl.gz` from the GitHub Release attached to this repository, then run:
+Download `catalog.jsonl.gz` from the
+[official Participant Kit release](https://github.com/TechJam2026/techjam-conversational-search/releases/tag/participant-kit),
+then run:
 
 ```bash
 gzip -dk catalog.jsonl.gz
@@ -42,6 +49,63 @@ python3 -m evaluator.local_evaluator
 
 Edit `starter/agent.py` to implement your system. Do not edit the evaluator or public labels when reporting your local score.
 The command writes per-session results and aggregate metrics to `results.json`.
+
+## Autonomous LLM Agent
+
+The editable Agent now supports an autonomous two-stage model loop on every
+turn:
+
+1. the model reads the safe conversation state and plans one to three local
+   catalog searches;
+2. SQLite FTS5 retrieves a bounded candidate pool from the frozen catalog;
+3. the model ranks only those candidates and returns both Top-10
+   recommendations and the next clarification question.
+
+Credentials must be injected through environment variables or the secret
+manager provided by the execution platform. Never put an API key in source
+code, `.env.example`, README text, logs, or Git history.
+
+```bash
+export TECHJAM_LLM_API_KEY='<provided-by-secret-manager>'
+export TECHJAM_LLM_MODEL='your-model-name'
+export TECHJAM_LLM_BASE_URL='https://api.openai.com/v1'
+python3 -m evaluator.local_evaluator
+```
+
+For local development, you may copy `.env.example` to the ignored `.env`
+file, fill it on your own machine, and load it into the current shell before
+running the evaluator:
+
+```bash
+set -a
+source .env
+set +a
+python3 -m evaluator.local_evaluator
+```
+
+`OPENAI_API_KEY`, `OPENAI_MODEL`, and `OPENAI_BASE_URL` are accepted as
+compatibility aliases. `TECHJAM_LLM_TIMEOUT` controls the per-request timeout
+and defaults to 45 seconds. The client uses an OpenAI-compatible Chat
+Completions endpoint and reports the prompt/completion token counts returned by
+the provider.
+
+If the model configuration is absent, unreachable, or returns unusable JSON,
+the Agent automatically falls back to stateful offline catalog retrieval and
+continues to satisfy the official interface. This matters because final
+scoring may disable network access.
+
+The no-key fallback was verified on all 200 public sessions with Hit Rate@10
+`0.85`, MRR `0.464188`, MTTC `4.605`, and TechnicalScore `0.692156`. This is a
+fallback reference result, not the score of the live LLM path.
+
+See [`docs/submission_report.md`](docs/submission_report.md) for the method,
+evaluation status, network behavior, model-cost disclosure, and limitations.
+
+The competition submission is the source bundle exporting the Python `Agent`
+class, not a hosted HTTP endpoint. A web API may be added for a demo, but the
+official evaluator must still be able to import and call `reset(...)` and
+`respond(...)` locally. Copy `.env.example` only for local configuration; the
+real `.env` file is ignored by Git and must not be submitted.
 
 The included weak BM25 starter scores Hit Rate@10 `0.125`, MRR `0.068034`, and
 MTTC `9.81` on the released public set. See `docs/baseline_results.json`.

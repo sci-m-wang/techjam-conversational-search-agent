@@ -1,0 +1,2 @@
+# No third-party runtime dependencies are required.
+# The model client uses Python's standard-library HTTP implementation.
