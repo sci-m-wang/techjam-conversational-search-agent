@@ -107,6 +107,12 @@ The no-key fallback was verified on all 200 public sessions with Hit Rate@10
 `0.85`, MRR `0.464188`, MTTC `4.605`, and TechnicalScore `0.692156`. This is a
 fallback reference result, not the score of the live LLM path.
 
+The `gpt-5.6-sol` live path was also evaluated on all 200 public sessions with
+Hit Rate@10 `0.935`, MRR `0.672671`, MTTC `3.765`, and TechnicalScore
+`0.814001`. The run used 3,164,704 reported model tokens and took about 4 hours
+13 minutes in the official serial evaluator. Public-set results are development
+measurements, not estimates of hidden-set performance.
+
 See [`docs/submission_report.md`](docs/submission_report.md) for the method,
 evaluation status, network behavior, model-cost disclosure, and limitations.
 

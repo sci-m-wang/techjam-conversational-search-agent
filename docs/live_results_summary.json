@@ -1,0 +1,44 @@
+{
+  "model": "gpt-5.6-sol",
+  "provider_type": "Azure-hosted OpenAI-compatible endpoint",
+  "evaluated_commit": "367fb7f",
+  "sample_count": 200,
+  "hit_rate_at_10": 0.935,
+  "mrr": 0.672671,
+  "mttc": 3.765,
+  "efficiency": 0.7235,
+  "recommended_technical_score": 0.814001,
+  "reported_token_usage": {
+    "prompt_tokens": 2788427,
+    "completion_tokens": 376277,
+    "total_tokens": 3164704
+  },
+  "actual_conversation_turns": 740,
+  "wall_seconds": 15174.44,
+  "scenario_metrics": {
+    "boundary": {
+      "sample_count": 10,
+      "hit_rate_at_10": 0.9,
+      "mrr": 0.72,
+      "mttc": 5.1
+    },
+    "browsing": {
+      "sample_count": 80,
+      "hit_rate_at_10": 0.9875,
+      "mrr": 0.712703,
+      "mttc": 3.0
+    },
+    "buying": {
+      "sample_count": 80,
+      "hit_rate_at_10": 0.95,
+      "mrr": 0.668646,
+      "mttc": 3.3125
+    },
+    "intent_override": {
+      "sample_count": 30,
+      "hit_rate_at_10": 0.766667,
+      "mrr": 0.560873,
+      "mttc": 6.566667
+    }
+  }
+}

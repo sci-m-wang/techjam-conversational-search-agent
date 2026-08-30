@@ -20,17 +20,12 @@ discarded or replaced by deterministic fallback behavior.
 
 ## Model and configuration
 
-The live path uses an OpenAI-compatible Chat Completions API. The exact provider
-and model are deployment configuration, not source-code constants. They are
-read only from `TECHJAM_LLM_API_KEY`, `TECHJAM_LLM_MODEL`, and
-`TECHJAM_LLM_BASE_URL` (with `OPENAI_*` compatibility aliases). Secrets are not
-included in this repository or its Git history.
-
-The final model name, measured token usage, latency, and provider-priced cost
-will be recorded here after the submitter configures the local environment and
-runs the public evaluator. Until then, the live-model result is intentionally
-reported as **not measured**, rather than being inferred from a manual study or
-from the offline fallback.
+The measured live run used `gpt-5.6-sol` through an Azure-hosted,
+OpenAI-compatible Chat Completions endpoint. The source remains provider
+agnostic: model, endpoint, and credential values are read only from
+`TECHJAM_LLM_API_KEY`, `TECHJAM_LLM_MODEL`, and `TECHJAM_LLM_BASE_URL` (with
+`OPENAI_*` compatibility aliases). Secrets are not included in this repository
+or its Git history.
 
 ## Network behavior and offline fallback
 
@@ -48,10 +43,23 @@ local evaluator:
 | Mode | Sessions | Hit Rate@10 | MRR | MTTC | TechnicalScore |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | Offline fallback | 200 | 0.850000 | 0.464188 | 4.605 | 0.692156 |
-| Configured live model | 200 | Pending | Pending | Pending | Pending |
+| `gpt-5.6-sol` live path | 200 | 0.935000 | 0.672671 | 3.765 | 0.814001 |
 
 The weak starter reference in the official kit reports Hit Rate@10 0.125, MRR
 0.068034, and MTTC 9.81.
+
+The same aggregate result is available in machine-readable form at
+`docs/live_results_summary.json`. Per-session evaluator records remain local
+and are not part of the submission.
+
+Live-model results by scenario:
+
+| Scenario | Sessions | Hit Rate@10 | MRR | MTTC |
+| --- | ---: | ---: | ---: | ---: |
+| Buying | 80 | 0.950000 | 0.668646 | 3.312500 |
+| Browsing | 80 | 0.987500 | 0.712703 | 3.000000 |
+| Intent override | 30 | 0.766667 | 0.560873 | 6.566667 |
+| Boundary | 10 | 0.900000 | 0.720000 | 5.100000 |
 
 ## Latency, tokens, and estimated cost
 
@@ -60,11 +68,17 @@ The weak starter reference in the official kit reports Hit Rate@10 0.125, MRR
 - Live mode: normally two model calls per turn (planning and decision). The
   agent reports the provider's prompt and completion token counters through the
   official `usage` field.
-- Live cost is calculated from the measured totals as
-  `(prompt_tokens × provider_input_price + completion_tokens × provider_output_price) / 1,000,000`.
-  A numeric estimate is pending the configured model and full public run.
+- The 200-session live run recorded 2,788,427 prompt tokens and 376,277
+  completion tokens, or 3,164,704 total (15,823.52 per session on average).
+- The official serial evaluator completed in 15,174.44 seconds (4 hours,
+  12 minutes, 54 seconds), averaging 75.87 seconds per session. There were 740
+  actual conversation turns, averaging 3.70 per session.
+- The Azure deployment's negotiated token prices were not available to the
+  evaluator, so a fabricated USD total is not reported. Given input price `Pi`
+  and output price `Po` in USD per million tokens, the measured run cost is
+  `2.788427 × Pi + 0.376277 × Po`.
 - Request timeout defaults to 45 seconds and is configurable with
-  `TECHJAM_LLM_TIMEOUT`.
+  `TECHJAM_LLM_TIMEOUT`; the measured long-running evaluation used 600 seconds.
 
 ## Reproduction
 
