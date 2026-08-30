@@ -83,6 +83,18 @@ def extract_json_object(content: str) -> dict:
     return value
 
 
+def compatibility_retry_body(body: dict, parameter: str) -> dict | None:
+    """Return a safer request body for common Chat Completions API variants."""
+    retry_body = dict(body)
+    if parameter == "max_tokens" and "max_tokens" in retry_body:
+        retry_body["max_completion_tokens"] = retry_body.pop("max_tokens")
+        return retry_body
+    if parameter in {"temperature", "response_format"} and parameter in retry_body:
+        retry_body.pop(parameter, None)
+        return retry_body
+    return None
+
+
 class OpenAICompatibleClient:
     """Small standard-library client for OpenAI-compatible Chat Completions APIs."""
 
@@ -129,13 +141,32 @@ class OpenAICompatibleClient:
             with urllib.request.urlopen(request, timeout=self.settings.timeout_seconds) as response:
                 decoded = json.loads(response.read().decode("utf-8"))
         except urllib.error.HTTPError as error:
+            parameter = self._error_parameter(error)
+            retry_body = compatibility_retry_body(body, parameter) if error.code == 400 else None
+            if retry_body is not None:
+                return self._post(
+                    retry_body,
+                    allow_json_mode_retry=allow_json_mode_retry and parameter != "response_format",
+                )
             if error.code == 400 and allow_json_mode_retry and "response_format" in body:
                 retry_body = dict(body)
                 retry_body.pop("response_format", None)
                 return self._post(retry_body, allow_json_mode_retry=False)
-            raise ModelClientError(f"Model API returned HTTP {error.code}") from error
+            suffix = f" for parameter {parameter!r}" if parameter else ""
+            raise ModelClientError(f"Model API returned HTTP {error.code}{suffix}") from error
         except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as error:
             raise ModelClientError("Model API request failed") from error
         if not isinstance(decoded, dict):
             raise ModelClientError("Model API response must be a JSON object")
         return decoded
+
+    @staticmethod
+    def _error_parameter(error: urllib.error.HTTPError) -> str:
+        try:
+            payload = json.loads(error.read().decode("utf-8"))
+        except (AttributeError, UnicodeDecodeError, json.JSONDecodeError):
+            return ""
+        if not isinstance(payload, dict) or not isinstance(payload.get("error"), dict):
+            return ""
+        parameter = payload["error"].get("param")
+        return parameter if isinstance(parameter, str) else ""

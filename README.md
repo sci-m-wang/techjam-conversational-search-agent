@@ -87,7 +87,16 @@ python3 -m evaluator.local_evaluator
 compatibility aliases. `TECHJAM_LLM_TIMEOUT` controls the per-request timeout
 and defaults to 45 seconds. The client uses an OpenAI-compatible Chat
 Completions endpoint and reports the prompt/completion token counts returned by
-the provider.
+the provider. It automatically negotiates the `max_tokens` versus
+`max_completion_tokens` difference used by newer reasoning models.
+
+Some Python.org macOS installations do not have a default CA certificate file.
+If a request fails with `CERTIFICATE_VERIFY_FAILED`, add the following local-only
+line to `.env`; do not disable TLS verification:
+
+```dotenv
+SSL_CERT_FILE=/etc/ssl/cert.pem
+```
 
 If the model configuration is absent, unreachable, or returns unusable JSON,
 the Agent automatically falls back to stateful offline catalog retrieval and

@@ -4,7 +4,11 @@ import os
 import unittest
 from unittest.mock import patch
 
-from starter.model_client import ModelSettings, extract_json_object
+from starter.model_client import (
+    ModelSettings,
+    compatibility_retry_body,
+    extract_json_object,
+)
 
 
 class ModelClientTest(unittest.TestCase):
@@ -33,6 +37,26 @@ class ModelClientTest(unittest.TestCase):
         self.assertEqual(
             extract_json_object('```json\n{"search_queries":["cotton shirt"]}\n```'),
             {"search_queries": ["cotton shirt"]},
+        )
+
+    def test_new_reasoning_model_token_parameter_is_negotiated(self) -> None:
+        original = {
+            "max_tokens": 50,
+            "temperature": 0.1,
+            "response_format": {"type": "json_object"},
+        }
+        retried = compatibility_retry_body(original, "max_tokens")
+
+        self.assertIsNotNone(retried)
+        self.assertNotIn("max_tokens", retried)
+        self.assertEqual(retried["max_completion_tokens"], 50)
+        self.assertEqual(original["max_tokens"], 50)
+
+    def test_unsupported_optional_parameter_is_removed(self) -> None:
+        original = {"temperature": 0.1, "model": "example-model"}
+        self.assertEqual(
+            compatibility_retry_body(original, "temperature"),
+            {"model": "example-model"},
         )
 
 
