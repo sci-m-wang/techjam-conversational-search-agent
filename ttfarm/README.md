@@ -151,21 +151,25 @@ clearly is not the templated judge - gets handed to the LLM agent in
 Measured on a private hostile-judge stress harness (a seeded, human-like
 customer: free-form phrasing, synonyms for clue words, vague categories, one
 clue per answer, difficult-customer moods; scoring mechanics identical to the
-official evaluator). The LLM stand-in is a deterministic mock with no synonym
-knowledge, so these are validation numbers for the machinery - a floor, not a
-forecast of what a real model adds:
+official evaluator). Full 200 sessions, real model (`gpt-5.4-mini`):
 
-| Agent under the hostile judge | TechnicalScore | HR@10 |
-| --- | ---: | ---: |
-| combined (handover armed, mock LLM) | **0.655** | 0.720 |
-| ttfarm alone | 0.648 | 0.710 |
-| starter full-time (mock LLM) | 0.593 | 0.725 |
-| starter offline fallback | 0.575 | 0.690 |
+| Agent under the hostile judge | TechnicalScore | HR@10 | MRR |
+| --- | ---: | ---: | ---: |
+| **combined (Tier 1 + alternation escalation)** | **0.8083** | **0.895** | **0.794** |
+| ttfarm + Tier 1 only | 0.7239 | 0.785 | 0.736 |
+| starter full-time | 0.7233 | 0.850 | 0.550 |
+| ttfarm alone (no key) | 0.6477 | 0.710 | 0.672 |
+| official weak baseline (hostile) | - | - | - |
 
-The run-level governor engaged the takeover, measured 4 wins in 9 sessions,
-and disabled it mid-run - exactly the "insurance must not cost more than the
-house" behavior it was built for. On the official judge the same machinery
-never fires at all.
+The combination beats both of its components by ~0.085: against Tier-1 alone
+it converts 24 additional sessions and loses 2. The escalation governor kept
+the takeover enabled at a 69% win rate (59 of 86 escalated sessions). Two
+calibrations came straight from paired per-session records: the model's
+override signal is only accepted alongside an override cue word (ungated it
+flipped 7 of 30 override sessions from win to loss), and the trigger turn is
+5 because 24 of 26 starter-exclusive wins land by its fifth turn. Cost of the
+full hostile run: ~1.1M tokens, 27 minutes. On the official judge the same
+machinery never fires at all - 0.9748 with zero probes, regression-pinned.
 
 ## Network, resources, and disclosure
 

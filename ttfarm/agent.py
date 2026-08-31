@@ -20,7 +20,7 @@ from pathlib import Path
 from ttfarm import llm
 from ttfarm.catalog import Catalog
 from ttfarm.escalation import EscalationController, SessionRecord, StarterHandover
-from ttfarm.nlu import Observation, parse
+from ttfarm.nlu import _OVERRIDE_CUES, Observation, parse
 from ttfarm.policy import choose_ask, choose_k, compose_message
 from ttfarm.search import rank
 from ttfarm.state import Session
@@ -67,8 +67,15 @@ class Agent:
         if obs.layer == 2 and llm.enabled():          # Tier 1: optional, flagged
             data = llm.extract(user_message)
             if data:
+                # Accept the model's override signal only when the message
+                # carries an override cue. Measured on the hostile harness:
+                # ungated, the model over-flags overrides, wiping the
+                # exclusion memory - 7 of 30 override sessions flipped from
+                # win to loss. An override without any cue word is far more
+                # likely a model hallucination than a real change of mind.
+                cued = any(c in user_message.lower() for c in _OVERRIDE_CUES)
                 obs = Observation(
-                    "override" if data.get("override") else obs.kind,
+                    "override" if (data.get("override") and cued) else obs.kind,
                     obs.scenario_hint, data.get("category") or obs.category,
                     [str(c) for c in (data.get("constraints") or [])][:4] or obs.constraints,
                     obs.loose_tokens, layer=3)

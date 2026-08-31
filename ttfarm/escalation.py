@@ -51,7 +51,7 @@ class EscalationController:
     def __init__(self) -> None:
         self.enabled = os.environ.get("COPILOT_ESCALATION", "1") == "1"
         self.force_tier = os.environ.get("COPILOT_FORCE_TIER", "")
-        self.t2_turn = _int_env("COPILOT_T2_TURN", 7)
+        self.t2_turn = _int_env("COPILOT_T2_TURN", 5)   # 24/26 of starter's exclusive wins land by its turn 5
         # 'alternate': after the trigger, starter and ttfarm take turns with
         # full lists and a shared exclusion set. Paired analysis on the hostile
         # harness showed the agents win DIFFERENT sessions (27 only-ttfarm vs
