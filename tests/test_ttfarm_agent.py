@@ -130,3 +130,81 @@ class BehaviorTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class _MockJsonClient:
+    """Minimal JsonModelClient: proves the tier-2 handover plumbing end to end."""
+
+    def complete_json(self, messages, max_tokens):
+        from starter.model_client import ModelResult, ModelUsage
+        text = " ".join(m.get("content", "") for m in messages)
+        usage = ModelUsage(prompt_tokens=10, completion_tokens=5)
+        if "search_queries" in text or "Plan this turn" in text:
+            return ModelResult({"search_queries": ["leather belt"],
+                                "ask_attribute": "feature"}, usage)
+        if "Choose recommendations" in text:
+            return ModelResult({"message": "How about these?",
+                                "ask_attribute": "feature",
+                                "recommendations": [{"parent_asin": "A1"}]}, usage)
+        return ModelResult({"ok": True}, usage)
+
+
+class EscalationTest(unittest.TestCase):
+    def _agent(self, factory=None):
+        import tempfile
+        tmp = tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False, encoding="utf-8")
+        for row in CATALOG:
+            tmp.write(json.dumps(row) + "\n")
+        tmp.close()
+        return Agent(tmp.name, handover_client_factory=factory)
+
+    def test_no_key_means_fully_inert(self):
+        import os
+        saved = {k: os.environ.pop(k, None) for k in
+                 ("TECHJAM_LLM_API_KEY", "OPENAI_API_KEY", "COPILOT_FORCE_TIER")}
+        try:
+            agent = self._agent()
+            agent.reset("s", {})
+            for turn in range(1, 11):
+                out = agent.respond("s", "totally freeform message about cowhide things", turn, 10)
+                self.assertIsInstance(out["message"], str)
+            self.assertEqual(agent.stats["tier2_turns"], 0)
+        finally:
+            for k, v in saved.items():
+                if v is not None:
+                    os.environ[k] = v
+
+    def test_forced_tier2_uses_handover_and_respects_exclusions(self):
+        import os
+        os.environ["COPILOT_FORCE_TIER"] = "2"
+        try:
+            agent = self._agent(factory=lambda: _MockJsonClient())
+            agent.reset("s", {"summary": "x"})
+            first = agent.respond("s", "I'm looking for Accessories Belts. Buckle closure", 1, 10)
+            self.assertIsInstance(first["message"], str)
+            self.assertTrue(agent.stats["tier2_turns"] >= 1)
+            shown_first = {r["parent_asin"] for r in first["recommendations"]}
+            second = agent.respond("s", "For that, what matters is: leather.", 2, 10)
+            shown_second = [r["parent_asin"] for r in second["recommendations"]]
+            # proven-wrong products from turn 1 must not be shown again
+            self.assertFalse(shown_first & set(shown_second))
+            self.assertGreater(agent.stats["tokens_spent"], 0)
+        finally:
+            os.environ.pop("COPILOT_FORCE_TIER", None)
+
+    def test_handover_failure_falls_back_to_deterministic_path(self):
+        import os
+        os.environ["COPILOT_FORCE_TIER"] = "2"
+
+        class _Boom:
+            def complete_json(self, messages, max_tokens):
+                raise RuntimeError("endpoint down mid-run")
+        try:
+            agent = self._agent(factory=lambda: _Boom())
+            agent.reset("s", {})
+            out = agent.respond("s", "I'm looking for Accessories Belts. Buckle closure", 1, 10)
+            # ping fails -> handover unavailable -> deterministic path answers
+            self.assertTrue(out["recommendations"])
+            self.assertEqual(agent.stats["tier2_turns"], 0)
+        finally:
+            os.environ.pop("COPILOT_FORCE_TIER", None)

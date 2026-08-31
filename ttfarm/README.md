@@ -120,6 +120,53 @@ ttfarm/docs/          plain-language and technical explainers (EN + CN)
 tests/test_ttfarm_agent.py   contract, behaviour and determinism tests
 ```
 
+## The combined architecture: escalation and handover
+
+`ttfarm/escalation.py` joins the two solutions in this repository into one
+agent, the way a well-run support desk works: the deterministic agent handles
+every call, and only a call that is clearly going wrong - in a world that
+clearly is not the templated judge - gets handed to the LLM agent in
+`starter/`.
+
+- **Tier 0 (default).** The deterministic pipeline above. Without a model key
+  this is the only tier that exists: no probe, no handover, byte-identical
+  behavior - regression-pinned at 0.9748 with zero escalations by the tests.
+- **Tier 1.** When a message needed the structural (layer-2) parser and
+  `COPILOT_LLM=1` is configured, the optional LLM parse assist may refine it.
+- **Tier 2 (takeover).** A losing session (late turn, spent clue harvest) in an
+  abnormal world (layer-2 parses, or a high run-level miss rate) hands its
+  remaining turns to `starter/`'s LLM agent - but only after a real endpoint
+  answered a reachability ping, because starter without a live model falls
+  back to a mode that scores worse than wounded ttfarm. The handover passes
+  the full case file: profile, transcript (replayed through starter's own
+  offline state API - zero tokens), and the proven-wrong products, which are
+  filtered out of starter's answers and backfilled with ttfarm's next best.
+- **Run-level governance.** Sessions are independent games, but the judge is
+  one world: early misses across sessions lower the takeover threshold, a
+  takeover tier that loses more than it wins is switched back off mid-run, and
+  hard budgets cap takeover sessions and total tokens. Knobs:
+  `COPILOT_ESCALATION`, `COPILOT_T2_TURN`, `COPILOT_T2_MAX_SESSIONS`,
+  `COPILOT_TOKEN_BUDGET`, `COPILOT_T2_TIMEOUT`, `COPILOT_FORCE_TIER` (tests).
+
+Measured on a private hostile-judge stress harness (a seeded, human-like
+customer: free-form phrasing, synonyms for clue words, vague categories, one
+clue per answer, difficult-customer moods; scoring mechanics identical to the
+official evaluator). The LLM stand-in is a deterministic mock with no synonym
+knowledge, so these are validation numbers for the machinery - a floor, not a
+forecast of what a real model adds:
+
+| Agent under the hostile judge | TechnicalScore | HR@10 |
+| --- | ---: | ---: |
+| combined (handover armed, mock LLM) | **0.655** | 0.720 |
+| ttfarm alone | 0.648 | 0.710 |
+| starter full-time (mock LLM) | 0.593 | 0.725 |
+| starter offline fallback | 0.575 | 0.690 |
+
+The run-level governor engaged the takeover, measured 4 wins in 9 sessions,
+and disabled it mid-run - exactly the "insurance must not cost more than the
+house" behavior it was built for. On the official judge the same machinery
+never fires at all.
+
 ## Network, resources, and disclosure
 
 - **Network: none required.** The scored path is fully offline and
