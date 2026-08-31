@@ -64,6 +64,7 @@ class Agent:
         record.last_turn = max(record.last_turn, turn)
 
         obs = parse(user_message, turn)
+        raw_layer = obs.layer          # pre-refinement: the world's true signal
         if obs.layer == 2 and llm.enabled():          # Tier 1: optional, flagged
             data = llm.extract(user_message)
             if data:
@@ -80,6 +81,10 @@ class Agent:
                     [str(c) for c in (data.get("constraints") or [])][:4] or obs.constraints,
                     obs.loose_tokens, layer=3)
         session.observe(obs)
+        # A layer-3 refinement must not hide that the message NEEDED layer 2:
+        # the abnormal-world signal feeds the escalation trigger, and Tier-1
+        # success would otherwise mask exactly the sessions that need help.
+        session.parse_layers.add(raw_layer)
 
         # ---- Tier 2: escalate a losing session (alternate or takeover) ----
         escalated = False
