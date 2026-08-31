@@ -65,8 +65,15 @@ beats always-on flagship thinking by +0.06 at under a third of the tokens.
 ## Development tools used
 
 - Python 3.10+ (standard library only at runtime)
-- _(fill: editors/IDEs; AI-assisted development tools if the team wishes to
-  disclose them — the rules require the list to be accurate)_
+- Git & GitHub (fork + pull-request workflow), GitHub CLI (`gh`)
+- AI-assisted development: OpenAI Codex and Anthropic Claude Code
+  (pair-programming agents) — used for coding, the experiment harnesses, and
+  documentation drafting; all reported measurements are produced by the
+  evaluation scripts committed in this repository
+- Google NotebookLM — demo-video generation from our written project
+  documentation
+- The official TechJam participant kit's unmodified local evaluator as the
+  test harness; headless Chrome for rendering the explainer PDFs
 
 ## APIs used
 
@@ -87,9 +94,9 @@ beats always-on flagship thinking by +0.06 at under a third of the tokens.
 
 ## Team
 
-TT Farm — _(fill: member names as registered)_
+TT Farm — Ming Wang, Wenjie Huang, Yang Xu, jayde zhang
 
 ## Links
 
 - Public repository: https://github.com/sci-m-wang/techjam-conversational-search-agent
-- Demo video (YouTube, public): _(fill)_
+- Demo video (YouTube, public): https://www.youtube.com/watch?v=DxUX4gwlFUk
