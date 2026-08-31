@@ -1,13 +1,18 @@
-# TT Farm — deterministic conversational shopping agent
+# The reflex layer — `ttfarm/`
 
-A second, independent solution for TechJam 2026 Track 4, living alongside the
-LLM agent in [`starter/`](../starter). It is **offline, deterministic and
-dependency-free**: the entire scored path is the Python standard library, with
-an optional LLM parsing layer behind a flag that is never required.
+The lightweight half of the combined agent: a deliberately small, offline,
+dependency-free fast path (Python standard library, ~3 ms per turn, zero
+tokens) that answers routine turns instantly so the AI agent in
+[`starter/`](../starter) is consulted only when a conversation actually needs
+deep thinking. This package also houses the **confidence controller and the
+handover** (`escalation.py`) — the piece that decides, turn by turn, when to
+wake the AI and what case file to hand it.
 
-Nothing outside this directory is modified. The official evaluator, the public
-labels, and the `starter/` agent are untouched; this package only adds a second
-`Agent` and the tooling to score either one.
+It is light by design, but complete: layered parsing, slot state with override
+decay, category-pool retrieval with evidence ranking, decision-theoretic list
+sizing, tests, and the evaluation and robustness tooling for the whole
+repository. Nothing outside this directory is modified — the official
+evaluator, the public labels, and the `starter/` agent are untouched.
 
 ## Results
 

@@ -1,191 +1,156 @@
-# Autonomous Conversational Search Agent — TechJam 2026
+# Autonomous Conversational Search Agent — TechJam 2026, Team TT Farm
 
-This repository is a participant solution built on the official
-[`TechJam2026/techjam-conversational-search`](https://github.com/TechJam2026/techjam-conversational-search)
-kit. The solution adds an autonomous, stateful LLM planning and ranking loop
-while retaining a network-free retrieval fallback.
+**Fast reflexes, deep thinking: an AI shopping agent that knows when to think harder.**
 
-Build an AI shopping agent that asks useful follow-up questions and recommends the customer's hidden target product within at most 10 turns.
+A customer hides one product in a 50,000-item catalog and gives you ten turns to
+find it. Our answer is an **autonomous AI agent** — an LLM-driven planning and
+ranking loop that reads any customer, plans its own catalog searches, and
+reasons over candidates — wrapped around a **lightweight reflex layer** that
+answers routine turns in 3 milliseconds for free.
 
-## What You Receive
+A confidence controller sits between them and decides, turn by turn, when a
+conversation needs the AI's full attention. Easy conversations never wake the
+model. Hard ones are handed over — with the full case file.
 
-- A frozen catalog of 50,000 products from the `Clothing_Shoes_and_Jewelry` category of Amazon Reviews 2023.
-- 200 labeled public sessions for local development.
-- A weak BM25 starter agent and deterministic local evaluator.
-- The Agent API contract and scoring rules.
+## The story in one diagram
 
-The organizer keeps 800 additional sessions private for final evaluation.
-
-## Task
-
-For each session, your agent receives an anonymized preference profile and a short customer message. Raw user IDs, review text, timestamps, and purchase history are never disclosed. On every turn the agent may:
-
-- ask a natural clarification question in `message` and identify one requested field in `ask_attribute`;
-- return a ranked list of up to 10 catalog `parent_asin` values;
-- do both in the same response.
-
-The session ends when the target product appears in the scored Top 10 or after turn 10. Sessions cover Buying, Browsing, Intent Override, and Boundary behavior.
-
-## Download the Catalog
-
-Download `catalog.jsonl.gz` from the
-[official Participant Kit release](https://github.com/TechJam2026/techjam-conversational-search/releases/tag/participant-kit),
-then run:
-
-```bash
-gzip -dk catalog.jsonl.gz
-mv catalog.jsonl data/catalog.jsonl
+```
+customer message
+      │
+      ▼
+┌─────────────────────┐   routine turn: answered instantly, $0
+│  reflex layer        │──────────────────────────────►  reply
+│  (ttfarm/, stdlib,   │
+│   3 ms per turn)     │   confidence low? session losing?
+└─────────┬───────────┘   world doesn't match expectations?
+          │ hand over the case file:
+          │ profile · every clue heard · products already ruled out
+          ▼
+┌─────────────────────┐
+│  AI agent            │   plans 1-3 catalog searches,
+│  (starter/, LLM      │   reasons over 30 candidates,
+│   planner + ranker)  │   asks the next smart question
+└─────────────────────┘──────────────────────────────►  reply
+          ▲
+          └── from then on the two take alternating turns,
+              sharing one exclusion list, until the product is found
 ```
 
-Verify the downloaded file using the published `SHA256SUMS` file.
+The interesting engineering is the **handover**: knowing *when* the AI is
+needed, and giving it everything the reflex layer learned so it starts smart,
+not blind. That is the brief's "runtime workflow re-orchestration", built and
+measured.
 
-## Run the Starter
+## Results
 
-Python 3.10 or later is recommended. The starter uses only the Python standard library.
+All numbers come from the **unmodified official evaluator**, full 200-session
+runs.
+
+**Official public benchmark** — templated customers, exactly as shipped:
+
+| Configuration | TechnicalScore | HitRate@10 | Tokens |
+| --- | ---: | ---: | ---: |
+| Combined agent (reflex layer handles everything) | **0.9748** | 1.000 | 0 |
+| Official weak baseline | 0.1067 | 0.125 | 0 |
+
+**Hostile stress benchmark** — a private harness where the customer behaves
+like a real human (free-form phrasing, synonyms for every clue, vague
+categories, moods), scoring mechanics identical to the official evaluator:
+
+| Configuration | TechnicalScore | HitRate@10 | Tokens | Wall clock |
+| --- | ---: | ---: | ---: | ---: |
+| **Combined agent (AI takes over when needed)** | **0.8100** | **0.905** | 1.3M | 28 min |
+| AI agent full-time, `gpt-5.6-sol` | 0.7483 | 0.840 | 4.5M | 3 h 44 m |
+| AI agent full-time, `gpt-5.4-mini` | 0.7233 | 0.850 | 5.5M | 42 min |
+| Reflex layer alone (no model) | 0.6477 | 0.710 | 0 | 1 min |
+
+Two sentences the tables earn:
+
+- **When the customer goes off-script, the AI agent is what saves the game**:
+  it takes over the losing sessions and wins 70% of them, lifting the hit rate
+  from 0.71 to 0.905.
+- **Thinking hard only when needed beats thinking hard always**: the combined
+  agent outscores the always-on flagship model by +0.06 while spending less
+  than a third of the tokens.
+
+## Run it
+
+Python 3.10+ recommended. No third-party runtime dependencies.
+
+**1. Get the catalog** (a release asset of the official kit):
 
 ```bash
-python3 -m evaluator.local_evaluator
+curl -LO https://github.com/TechJam2026/techjam-conversational-search/releases/download/participant-kit/catalog.jsonl.gz
+curl -LO https://github.com/TechJam2026/techjam-conversational-search/releases/download/participant-kit/SHA256SUMS
+shasum -a 256 -c SHA256SUMS --ignore-missing     # catalog.jsonl.gz: OK
+gzip -dk catalog.jsonl.gz && mv catalog.jsonl data/catalog.jsonl
 ```
 
-Edit `starter/agent.py` to implement your system. Do not edit the evaluator or public labels when reporting your local score.
-The command writes per-session results and aggregate metrics to `results.json`.
-
-## Autonomous LLM Agent
-
-The editable Agent now supports an autonomous two-stage model loop on every
-turn:
-
-1. the model reads the safe conversation state and plans one to three local
-   catalog searches;
-2. SQLite FTS5 retrieves a bounded candidate pool from the frozen catalog;
-3. the model ranks only those candidates and returns both Top-10
-   recommendations and the next clarification question.
-
-Credentials must be injected through environment variables or the secret
-manager provided by the execution platform. Never put an API key in source
-code, `.env.example`, README text, logs, or Git history.
+**2. Score it with the official evaluator** — no key needed for the public
+benchmark:
 
 ```bash
-export TECHJAM_LLM_API_KEY='<provided-by-secret-manager>'
-export TECHJAM_LLM_MODEL='your-model-name'
+python3 -m evaluator.local_evaluator            # scores starter/ (the AI agent path)
+python3 -m ttfarm.tools.run_eval                # scores the combined agent -> 0.9748
+python3 -m unittest discover tests              # 23 tests
+```
+
+**3. Enable the AI agent** (optional — used when conversations get hard):
+
+```bash
+export TECHJAM_LLM_API_KEY='<from your secret manager - never commit it>'
+export TECHJAM_LLM_MODEL='gpt-5.4-mini'         # or any OpenAI-compatible model
 export TECHJAM_LLM_BASE_URL='https://api.openai.com/v1'
-python3 -m evaluator.local_evaluator
 ```
 
-For local development, you may copy `.env.example` to the ignored `.env`
-file, fill it on your own machine, and load it into the current shell before
-running the evaluator:
+`OPENAI_API_KEY/MODEL/BASE_URL` work as aliases; `TECHJAM_LLM_TIMEOUT` sets the
+per-request timeout. For local development copy `.env.example` to the ignored
+`.env`. If a request fails with `CERTIFICATE_VERIFY_FAILED` on a python.org
+macOS build, set `SSL_CERT_FILE=/etc/ssl/cert.pem` locally; never disable TLS
+verification. **If the model configuration is absent or unreachable, the agent
+runs fully offline and still satisfies the official interface** — final
+scoring may disable network access, and this repository loses nothing when it
+does.
 
-```bash
-set -a
-source .env
-set +a
-python3 -m evaluator.local_evaluator
+## What lives where
+
+```
+starter/    the AI agent: LLM planner -> FTS5 catalog retrieval -> LLM ranker,
+            stateful across turns, provider-agnostic, validated JSON I/O
+ttfarm/     the reflex layer + the confidence controller and handover
+            (escalation.py), plus evaluation tools and robustness suites
+evaluator/  the official local evaluator - unmodified
+tests/      23 tests: both agents, the handover, contract fuzzing, regression pins
+docs/       submission report, Devpost text, results, explainer PDFs (EN + CN)
 ```
 
-`OPENAI_API_KEY`, `OPENAI_MODEL`, and `OPENAI_BASE_URL` are accepted as
-compatibility aliases. `TECHJAM_LLM_TIMEOUT` controls the per-request timeout
-and defaults to 45 seconds. The client uses an OpenAI-compatible Chat
-Completions endpoint and reports the prompt/completion token counts returned by
-the provider. It automatically negotiates the `max_tokens` versus
-`max_completion_tokens` difference used by newer reasoning models.
+Deep dives: [`docs/submission_report.md`](docs/submission_report.md) (method,
+disclosure, limitations) and [`ttfarm/README.md`](ttfarm/README.md) (the reflex
+layer and the escalation design, with every measurement).
 
-Some Python.org macOS installations do not have a default CA certificate file.
-If a request fails with `CERTIFICATE_VERIFY_FAILED`, add the following local-only
-line to `.env`; do not disable TLS verification:
+## Honesty notes
 
-```dotenv
-SSL_CERT_FILE=/etc/ssl/cert.pem
-```
+- The evaluator and public labels were never modified; every score above comes
+  from the official scorer. The hostile harness reuses its exact scoring
+  mechanics and is kept out of this repository (it is a private stress tool).
+- Public-set results are development measurements, not hidden-set predictions.
+  With n=200 the sampling noise is roughly ±0.02–0.03; our honest expectation
+  for the official hidden set is **0.95 ± 0.03**.
+- Escalation decisions were calibrated on paired per-session records from the
+  tune split; the details and the two calibrations that came out of it are in
+  `ttfarm/README.md`.
 
-If the model configuration is absent, unreachable, or returns unusable JSON,
-the Agent automatically falls back to stateful offline catalog retrieval and
-continues to satisfy the official interface. This matters because final
-scoring may disable network access.
+## Team
 
-The no-key fallback was verified on all 200 public sessions with Hit Rate@10
-`0.85`, MRR `0.464188`, MTTC `4.605`, and TechnicalScore `0.692156`. This is a
-fallback reference result, not the score of the live LLM path.
+Team **TT Farm**.
 
-The `gpt-5.6-sol` live path was also evaluated on all 200 public sessions with
-Hit Rate@10 `0.935`, MRR `0.672671`, MTTC `3.765`, and TechnicalScore
-`0.814001`. The run used 3,164,704 reported model tokens and took about 4 hours
-13 minutes in the official serial evaluator. Public-set results are development
-measurements, not estimates of hidden-set performance.
+| Member | Contribution |
+| --- | --- |
+| _(name)_ | _(to be filled)_ |
+| _(name)_ | _(to be filled)_ |
 
-See [`docs/submission_report.md`](docs/submission_report.md) for the method,
-evaluation status, network behavior, model-cost disclosure, and limitations.
+## Data
 
-The competition submission is the source bundle exporting the Python `Agent`
-class, not a hosted HTTP endpoint. A web API may be added for a demo, but the
-official evaluator must still be able to import and call `reset(...)` and
-`respond(...)` locally. Copy `.env.example` only for local configuration; the
-real `.env` file is ignored by Git and must not be submitted.
-
-The included weak BM25 starter scores Hit Rate@10 `0.125`, MRR `0.068034`, and
-MTTC `9.81` on the released public set. See `docs/baseline_results.json`.
-
-## Agent Interface
-
-```python
-class Agent:
-    def reset(self, session_id: str, user_profile: dict) -> None:
-        ...
-
-    def respond(self, session_id: str, user_message: str, turn: int, top_k: int) -> dict:
-        return {
-            "message": "Do you have a material preference?",
-            "ask_attribute": "material",
-            "recommendations": [
-                {"parent_asin": "B000..."},
-                {"parent_asin": "B001..."}
-            ],
-            "usage": {"prompt_tokens": 120, "completion_tokens": 30}
-        }
-```
-
-`ask_attribute` is one of `category`, `material`, `color`, `size`, `style`, `brand`, `budget`, `feature`, `use_case`, `other`, or `null`. See `docs/agent_api_contract.json`.
-
-## Technical Metrics
-
-- **Hit Rate@10:** fraction of sessions that find the target within 10 turns.
-- **MRR:** mean reciprocal rank of the target; a miss contributes zero.
-- **MTTC:** mean first-hit turn; a miss is assigned turn 11.
-- **Reported token usage:** prompt and completion tokens returned by the team's model client.
-
-```text
-TechnicalScore = 0.50 × HitRate@10 + 0.30 × MRR + 0.20 × Efficiency
-Efficiency = clip((11 - MTTC) / 10, 0, 1)
-```
-
-`TechnicalScore` is an objective input to the `Technical Execution` assessment. It is not a separate judging criterion and does not represent the entire `Technical Execution` score.
-
-Only exact `parent_asin` equality produces a hit. Core metrics are also reported by scenario.
-
-## Model Choice and Cost
-
-Teams may use any legally accessible LLM API or local model. Teams manage their own credentials and must never commit API keys. Model choice, estimated cost, token usage, and latency must be disclosed. Token usage is a feasibility metric, not part of the core technical score. The organizer does not provide or reimburse model API credits; teams are responsible for any costs incurred through optional external services.
-
-## Files
-
-```text
-data/public_set.jsonl             200 labeled development sessions
-docs/competition_specification.md participant rules and evaluation protocol
-docs/agent_api_contract.json      machine-readable Agent contract
-docs/evaluation_config.json       scoring configuration
-docs/baseline_results.json        reproducible weak-starter reference score
-starter/agent.py                  editable weak starter
-evaluator/local_evaluator.py      public-set simulator and scorer
-```
-
-## Judging and Submission Policy
-
-- Participant submission requirements: `docs/submission_rules.md`
-- Organizer-only final judging controls: `organizer/JUDGING_RUNBOOK.md`
-- Organizer private release checklist: `organizer/private_release_checklist.md`
-- Judging day operations SOP: `organizer/JUDGING_DAY_SOP.md`
-
-## Data Source
-
-The catalog and sessions are derived from Amazon Reviews 2023 by McAuley Lab, UCSD. See `DATA_ATTRIBUTION.md` before using or redistributing the data.
-Sessions are sampled deterministically from the official Clothing 5-core leave-last-out split and joined to the frozen catalog.
+The catalog and sessions derive from Amazon Reviews 2023 (McAuley Lab, UCSD) —
+see [`DATA_ATTRIBUTION.md`](DATA_ATTRIBUTION.md). Competition data is used only
+for this competition and will be deleted when it ends, per the event rules.
