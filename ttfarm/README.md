@@ -156,12 +156,16 @@ official evaluator). Full 200 sessions, real model (`gpt-5.4-mini`):
 | Agent under the hostile judge | TechnicalScore | HR@10 | MRR |
 | --- | ---: | ---: | ---: |
 | **combined (Tier 1 + alternation escalation)** | **0.8100** | **0.905** | **0.790** |
+| starter full-time, `gpt-5.6-sol` (flagship) | 0.7483 | 0.840 | 0.657 |
 | ttfarm + Tier 1 only | 0.7239 | 0.785 | 0.736 |
 | starter full-time | 0.7233 | 0.850 | 0.550 |
 | ttfarm alone (no key) | 0.6477 | 0.710 | 0.672 |
 | official weak baseline (hostile) | - | - | - |
 
-The combination beats both of its components by ~0.086. The escalation
+The combination beats both of its components by ~0.086 - and beats the
+flagship reasoning model running the starter solo by +0.06 at roughly a
+third of the tokens and an eighth of the wall clock: on this harness,
+architecture beats model size. The escalation
 governor kept the takeover enabled at a 70% win rate (69 of 98 escalated
 sessions), engaging per-session from the first game. Two
 calibrations came straight from paired per-session records: the model's
