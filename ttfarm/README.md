@@ -155,20 +155,20 @@ official evaluator). Full 200 sessions, real model (`gpt-5.4-mini`):
 
 | Agent under the hostile judge | TechnicalScore | HR@10 | MRR |
 | --- | ---: | ---: | ---: |
-| **combined (Tier 1 + alternation escalation)** | **0.8083** | **0.895** | **0.794** |
+| **combined (Tier 1 + alternation escalation)** | **0.8100** | **0.905** | **0.790** |
 | ttfarm + Tier 1 only | 0.7239 | 0.785 | 0.736 |
 | starter full-time | 0.7233 | 0.850 | 0.550 |
 | ttfarm alone (no key) | 0.6477 | 0.710 | 0.672 |
 | official weak baseline (hostile) | - | - | - |
 
-The combination beats both of its components by ~0.085: against Tier-1 alone
-it converts 24 additional sessions and loses 2. The escalation governor kept
-the takeover enabled at a 69% win rate (59 of 86 escalated sessions). Two
+The combination beats both of its components by ~0.086. The escalation
+governor kept the takeover enabled at a 70% win rate (69 of 98 escalated
+sessions), engaging per-session from the first game. Two
 calibrations came straight from paired per-session records: the model's
 override signal is only accepted alongside an override cue word (ungated it
 flipped 7 of 30 override sessions from win to loss), and the trigger turn is
 5 because 24 of 26 starter-exclusive wins land by its fifth turn. Cost of the
-full hostile run: ~1.1M tokens, 27 minutes. On the official judge the same
+full hostile run: ~1.3M tokens, 28 minutes. On the official judge the same
 machinery never fires at all - 0.9748 with zero probes, regression-pinned.
 
 ## Network, resources, and disclosure
