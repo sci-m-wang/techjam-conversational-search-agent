@@ -40,7 +40,8 @@ class SessionRecord:
     """What the controller remembers about one session."""
     transcript: list = field(default_factory=list)   # (customer_msg, our_msg, ask)
     last_turn: int = 0
-    tier2: bool = False                              # handover engaged
+    tier2: bool = False                              # escalation engaged
+    tier2_turns: int = 0                             # escalated turns so far
     ended_by_miss: bool | None = None                # filled when the next reset arrives
 
 
@@ -51,6 +52,18 @@ class EscalationController:
         self.enabled = os.environ.get("COPILOT_ESCALATION", "1") == "1"
         self.force_tier = os.environ.get("COPILOT_FORCE_TIER", "")
         self.t2_turn = _int_env("COPILOT_T2_TURN", 7)
+        # 'alternate': after the trigger, starter and ttfarm take turns with
+        # full lists and a shared exclusion set. Paired analysis on the hostile
+        # harness showed the agents win DIFFERENT sessions (27 only-ttfarm vs
+        # 30 only-starter), so a full takeover gambles away ttfarm's exclusive
+        # wins; alternation keeps both in play.
+        self.t2_mode = os.environ.get("COPILOT_T2_MODE", "alternate")
+        # 'alternate': after the trigger, starter and ttfarm take turns with
+        # full lists and a shared exclusion set - paired analysis showed the
+        # two agents win DIFFERENT sessions (27 only-ttfarm vs 30 only-starter
+        # on the hostile harness), so a full takeover gambles away ttfarm's
+        # exclusive wins while alternation keeps both in play.
+        self.t2_mode = os.environ.get("COPILOT_T2_MODE", "alternate")
         self.t2_max_sessions = _int_env("COPILOT_T2_MAX_SESSIONS", 400)
         self.token_budget = _int_env("COPILOT_TOKEN_BUDGET", 3_000_000)
         # run-level state
@@ -119,6 +132,18 @@ class EscalationController:
         if not (losing or turn >= self.t2_turn + 1):
             return False
         return bool(handover_available())
+
+    def starter_drives(self, record: SessionRecord) -> bool:
+        """Within an escalated session: is this turn starter's or ttfarm's?"""
+        if self.t2_mode != "alternate":
+            return True                        # classic full takeover
+        return record.tier2_turns % 2 == 0     # starter first, then alternate
+
+    def starter_drives(self, record: SessionRecord) -> bool:
+        """Within an escalated session: is this turn starter's or ttfarm's?"""
+        if self.t2_mode != "alternate":
+            return True                        # classic full takeover
+        return record.tier2_turns % 2 == 0     # starter first, then alternate
 
     def stats(self) -> dict:
         return {

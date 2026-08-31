@@ -74,26 +74,34 @@ class Agent:
                     obs.loose_tokens, layer=3)
         session.observe(obs)
 
-        # ---- Tier 2: hand a losing session to the starter LLM agent ----
+        # ---- Tier 2: escalate a losing session (alternate or takeover) ----
+        escalated = False
         if self.controller.wants_tier2(session, record, turn,
                                        self.handover.available):
             record.tier2 = True
-            response = self.handover.respond(
-                session_id, session.profile, record, session.shown,
-                user_message, turn, top_k,
-                backfill=lambda n: rank(self.catalog, session, limit=n))
-            if response is not None:
-                self.tier2_turns += 1
-                self.controller.spend(response.get("usage", {}))
-                shown_now = [r["parent_asin"] for r in response["recommendations"]]
-                session.shown.update(shown_now)
-                record.transcript.append(
-                    (user_message, response["message"], response["ask_attribute"]))
-                return response
-            # handover failed: fall through to the deterministic path
+            escalated = True
+            if self.controller.starter_drives(record):
+                response = self.handover.respond(
+                    session_id, session.profile, record, session.shown,
+                    user_message, turn, top_k,
+                    backfill=lambda n: rank(self.catalog, session, limit=n))
+                if response is not None:
+                    record.tier2_turns += 1
+                    self.tier2_turns += 1
+                    self.controller.spend(response.get("usage", {}))
+                    shown_now = [r["parent_asin"] for r in response["recommendations"]]
+                    session.shown.update(shown_now)
+                    record.transcript.append(
+                        (user_message, response["message"], response["ask_attribute"]))
+                    return response
+                # handover failed: fall through to the deterministic path
+            else:
+                record.tier2_turns += 1        # ttfarm's alternation turn
 
         # ---- Tier 0: the deterministic ttfarm pipeline ----
-        k = choose_k(session, turn, top_k)
+        # On an escalated ttfarm turn, show the full list: in a hostile world
+        # coverage beats sniping, and starter covers the other turns.
+        k = top_k if escalated else choose_k(session, turn, top_k)
         # Turn 10 safety net: re-rank over the full pool ignoring the exclusion
         # memory, in case an unparsed override made us exclude the true target.
         recs = rank(self.catalog, session, limit=k, exclude_shown=turn < 10) if k else []
