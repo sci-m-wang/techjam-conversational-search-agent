@@ -2,6 +2,8 @@
 
 **Fast reflexes, deep thinking: an AI shopping agent that knows when to think harder.**
 
+📺 **Demo video:** https://www.youtube.com/watch?v=DxUX4gwlFUk
+
 A customer hides one product in a 50,000-item catalog and gives you ten turns to
 find it. Our answer is an **autonomous AI agent** — an LLM-driven planning and
 ranking loop that reads any customer, plans its own catalog searches, and
@@ -146,8 +148,10 @@ Team **TT Farm**.
 
 | Member | Contribution |
 | --- | --- |
-| _(name)_ | _(to be filled)_ |
-| _(name)_ | _(to be filled)_ |
+| Ming Wang | Autonomous AI agent (`starter/`): LLM planning and ranking loop, model client, live evaluation runs; repository owner |
+| Wenjie Huang | Reflex layer and escalation (`ttfarm/`): fast path, confidence controller and handover, evaluation and robustness tooling; submission writings |
+| Yang Xu | Early-stage brainstorming and track research; QA design; data preparation; independent reproduction of the evaluation pipeline from a clean clone |
+| jayde zhang | Early-stage brainstorming and pre-research; submission QA — demo-video fact-check, documentation proofreading, registration and publication verification; data preparation support |
 
 ## Data
 
